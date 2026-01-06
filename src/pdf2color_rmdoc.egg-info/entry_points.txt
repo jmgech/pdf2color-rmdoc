@@ -1,0 +1,2 @@
+[console_scripts]
+pdf2color-rmdoc = pdf2color_rmdoc.cli:main

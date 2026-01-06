@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/pdf2color_rmdoc/__init__.py
+src/pdf2color_rmdoc/cli.py
+src/pdf2color_rmdoc.egg-info/PKG-INFO
+src/pdf2color_rmdoc.egg-info/SOURCES.txt
+src/pdf2color_rmdoc.egg-info/dependency_links.txt
+src/pdf2color_rmdoc.egg-info/entry_points.txt
+src/pdf2color_rmdoc.egg-info/top_level.txt
