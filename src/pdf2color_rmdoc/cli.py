@@ -1,29 +1,47 @@
 import argparse
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
 
-def _which_or_die(cmd: str) -> str:
-    p = shutil.which(cmd)
-    if not p:
-        raise SystemExit(
-            f"ERROR: '{cmd}' not found in PATH.\n"
-            f"Fix: install Drawj2d and ensure a 'drawj2d' executable is available.\n"
-            f"Try: drawj2d -h"
-        )
-    return p
+def _find_drawj2d() -> str:
+    """
+    Resolve the drawj2d executable in a Homebrew-friendly way.
+
+    Priority:
+    1) PDF2COLOR_RMDOC_DRAWJ2D env var (set by Homebrew formula wrapper)
+    2) drawj2d found in PATH
+    """
+    env_path = os.environ.get("PDF2COLOR_RMDOC_DRAWJ2D", "").strip()
+    if env_path:
+        p = Path(env_path).expanduser()
+        if p.exists() and p.is_file():
+            return str(p)
+
+    p2 = shutil.which("drawj2d")
+    if p2:
+        return p2
+
+    raise SystemExit(
+        "ERROR: 'drawj2d' not found.\n"
+        "Fix:\n"
+        "  - If installed via Homebrew, reinstall/relink pdf2color-rmdoc.\n"
+        "  - Otherwise, install Drawj2d and ensure 'drawj2d' is in your PATH.\n"
+        "Test:\n"
+        "  drawj2d -h"
+    )
 
 
 def run_drawj2d(input_pdf: Path, output_rmdoc: Path, resolution: int | None) -> None:
-    drawj2d = _which_or_die("drawj2d")
+    drawj2d = _find_drawj2d()
 
     # Drawj2d consumes a simple script on stdin. We embed the PDF as an image.
-    # Color is preserved only when Drawj2d's rmdoc backend maps the PDF colors.
     script = f"image {input_pdf.as_posix()}\n"
 
-    argv = [drawj2d, "-Trmdoc", "-o", str(output_rmdoc)]
+    argv: list[str] = [drawj2d, "-Trmdoc", "-o", str(output_rmdoc)]
     if resolution is not None:
+        # Drawj2d accepts -rNNN to scale output for different device targets.
         argv.insert(2, f"-r{resolution}")
 
     proc = subprocess.run(
@@ -33,13 +51,17 @@ def run_drawj2d(input_pdf: Path, output_rmdoc: Path, resolution: int | None) -> 
         capture_output=True,
     )
     if proc.returncode != 0:
-        raise SystemExit(f"Drawj2d failed:\n{proc.stderr.strip()}\n{proc.stdout.strip()}")
+        msg = proc.stderr.strip() or proc.stdout.strip() or "Unknown error"
+        raise SystemExit(f"Drawj2d failed:\n{msg}")
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="pdf2color-rmdoc",
-        description="Convert a PDF to a reMarkable .rmdoc using Drawj2d (color-aware on Paper Pro when supported).",
+        description=(
+            "Convert a PDF to a reMarkable .rmdoc using Drawj2d "
+            "(color-aware on Paper Pro when supported by the source PDF)."
+        ),
     )
     p.add_argument("input_pdf", help="Path to input PDF")
     p.add_argument("-o", "--output", help="Output .rmdoc path (default: <input>.rmdoc)")
@@ -47,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--resolution",
         type=int,
         default=None,
-        help="Optional scaling resolution (Drawj2d -rNNN). Example: 229 for Paper Pro scaling.",
+        help="Optional scaling resolution (Drawj2d -rNNN). Example: 229 for Paper Pro.",
     )
     return p
 
